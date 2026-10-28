@@ -2,9 +2,18 @@
   "name": "proxykit",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
-    "build": "npm run build -w @proxykit/core",
-    "test": "npm test -w @proxykit/core"
+    "build": "npm run build -w @proxykit/core && npm run build -w @proxykit/desktop",
+    "test": "npm test -w @proxykit/core && npm test -w @proxykit/desktop",
+    "desktop": "npm run build && npm start -w @proxykit/desktop",
+    "desktop:dev": "npm run build -w @proxykit/core && npm run dev -w @proxykit/desktop",
+    "typecheck": "tsc -p packages/core --noEmit && npm run typecheck -w @proxykit/desktop"
+  },
+  "engines": {
+    "node": ">=22.13"
   }
 }

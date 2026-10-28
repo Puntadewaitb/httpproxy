@@ -1,22 +1,25 @@
 # ProxyKit
 
-MITM proxy buat VAPT (mirip HTTP Toolkit / Burp Proxy). Repo ini baru berisi **core headless**; UI Electron menyusul di `apps/desktop`.
+MITM proxy buat VAPT (mirip HTTP Toolkit / Burp Proxy): core headless + UI desktop Electron.
 
 ```
-packages/core   @proxykit/core: proxy, CA, intercept queue, repeater, SQLite history, HAR (siap dipakai UI/CLI)
-apps/desktop    (kosong) Electron + React, nanti import @proxykit/core
+packages/core   @proxykit/core: proxy, CA, intercept queue, repeater, SQLite history, HAR (dipakai CLI & desktop)
+apps/desktop    @proxykit/desktop: Electron + React (History, Intercept, Repeater, Events, Settings)
 ```
 
-Stack: Node 20+, TypeScript, [mockttp](https://github.com/httptoolkit/mockttp) (Apache-2.0), better-sqlite3, ws.
+Stack: Node 22.13+, TypeScript, [mockttp](https://github.com/httptoolkit/mockttp) (Apache-2.0), `node:sqlite` (built-in, tanpa native module), ws.
 
 ## Quickstart
 
 ```bash
 npm install
-npm test            # 48 test end-to-end (HTTP, HTTPS MITM, WebSocket, intercept, repeater, HAR)
+npm test            # core: 50 test end-to-end (HTTP, HTTPS MITM, WebSocket, intercept, repeater, HAR) + desktop: 31
 npm run build
-node packages/core/dist/cli.js --port 8080 --har out.har   # Ctrl+C untuk export HAR
+node packages/core/dist/cli.js --port 8080 --har out.har   # CLI, Ctrl+C untuk export HAR
+npm run desktop     # UI desktop (build + jalankan Electron)
 ```
+
+Detail UI desktop: [`apps/desktop/README.md`](apps/desktop/README.md).
 
 CLI menyimpan CA + `history.db` di `~/.proxykit` (ubah dengan `--data-dir`). Opsi lain: `--insecure` (abaikan cert upstream self-signed), `--tls-passthrough "*.apple.com"` (jangan intercept host tertentu, mis. yang pakai pinning).
 
@@ -70,5 +73,6 @@ Event untuk UI: `proxy.on('exchange' | 'tls-error' | 'client-error')`, `queue.on
 - **WebSocket**: capture dua arah (text/binary) + close code; frame belum bisa di-intercept/edit.
 - **HTTP/2**: belum diuji di sini (semua test HTTP/1.1).
 - Repeater tidak decode `zstd` (dikembalikan apa adanya).
-- Belum ada: Electron UI, setup device Android/iOS (adb, install CA ke system store), Frida untuk bypass pinning, match-and-replace otomatis. Semuanya butuh mesin dengan display/device.
+- Belum ada: packaging installer desktop (electron-builder), setup device Android/iOS (adb, install CA ke system store), Frida untuk bypass pinning, match-and-replace otomatis. Semuanya butuh mesin dengan display/device.
+- Node 22.x mencetak `ExperimentalWarning: SQLite` sekali saat start (node:sqlite masih experimental di 22; di Electron/Node 24 tidak).
 - `npm audit` melaporkan advisory `basic-ftp` (transitive: mockttp → pac-proxy-agent → get-uri). Hanya terjangkau kalau PAC di-fetch via FTP; tidak relevan untuk pemakaian proxy lokal ini.
