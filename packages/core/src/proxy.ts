@@ -79,6 +79,20 @@ function responseChanged(a: ResponseSnapshot, b: ResponseSnapshot): boolean {
   );
 }
 
+/**
+ * mockttp menimpa `host` & `content-length` (lowercase) di atas object header dari callback.
+ * Kalau user menulis `Host` / `Content-Length`, hasilnya header dobel di wire (upstream membalas 400).
+ * Jadi dua header itu dinormalisasi ke lowercase; header lain tetap casing asli.
+ */
+function headersForMockttp(h: RawHeaders) {
+  return toHeadersObject(
+    h.map(([k, v]) => {
+      const l = k.toLowerCase();
+      return [l === 'host' || l === 'content-length' ? l : k, v] as [string, string];
+    }),
+  );
+}
+
 function hostOfUrl(url: string): string | undefined {
   try {
     return new URL(url).host;
@@ -202,7 +216,7 @@ export class ProxyServer extends EventEmitter<ProxyEvents> {
           ) {
             headers = removeHeader(headers, 'host');
           }
-          result.headers = toHeadersObject(headers);
+          result.headers = headersForMockttp(headers);
         }
         if (!effective.body.equals(snap.body)) result.body = effective.body;
         return result;
@@ -256,7 +270,7 @@ export class ProxyServer extends EventEmitter<ProxyEvents> {
         } = {};
         if (effective.statusCode !== snap.statusCode) result.statusCode = effective.statusCode;
         if (effective.statusMessage !== snap.statusMessage) result.statusMessage = effective.statusMessage;
-        if (!sameHeaders(effective.headers, snap.headers)) result.headers = toHeadersObject(effective.headers);
+        if (!sameHeaders(effective.headers, snap.headers)) result.headers = headersForMockttp(effective.headers);
         if (!effective.body.equals(snap.body)) result.body = effective.body;
         return result;
       },

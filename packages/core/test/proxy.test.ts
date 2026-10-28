@@ -212,6 +212,32 @@ describe('intercept: request', () => {
     assert.equal(echoed.headers['content-length'], '6');
   });
 
+  it('edit header ber-casing asli (Host, Content-Length) + body: tidak ada header dobel di wire', async () => {
+    queue.configure({ requests: true });
+    // Node client mengirim "Host" & "Content-Length" (kapital), seperti browser / app mobile pada HTTP/1.1.
+    const p = viaProxy(port, `${HTTP()}/echo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain', 'Content-Length': '5' },
+      body: 'short',
+    });
+    const held = await lastHeld();
+    assert.ok(held.request.headers.some(([k]) => k === 'Content-Length'), 'precondition: casing asli');
+    // Alur UI: user edit body, editor ikut update Content-Length di tempat.
+    const body = 'a much longer body';
+    const headers = held.request.headers.map(([k, v]) =>
+      k.toLowerCase() === 'content-length' ? ([k, String(body.length)] as [string, string]) : ([k, v] as [string, string]),
+    );
+    queue.forward(held.key, { headers, body });
+
+    const r = await p;
+    assert.equal(r.status, 200);
+    const seen = target.seen.at(-1)!;
+    const names = seen.rawHeaders.filter((_, i) => i % 2 === 0).map((k) => k.toLowerCase());
+    assert.equal(names.filter((k) => k === 'content-length').length, 1, `content-length dobel: ${seen.rawHeaders}`);
+    assert.equal(names.filter((k) => k === 'host').length, 1, `host dobel: ${seen.rawHeaders}`);
+    assert.equal(seen.body, body);
+  });
+
   it('edit URL ke host lain: Host header ikut menyesuaikan (kalau tidak disentuh user)', async () => {
     queue.configure({ requests: true });
     const p = viaProxy(port, `${HTTP()}/echo`);
@@ -394,6 +420,18 @@ describe('intercept: response', () => {
     const r = await p;
     assert.equal(r.headers['content-encoding'], 'gzip');
     assert.equal(gunzipSync(r.body).toString(), 'compressed-EDITED');
+  });
+
+  it('edit header response dengan Content-Length basi + casing asli: client dapat satu Content-Length yang benar', async () => {
+    queue.configure({ responses: true });
+    const p = viaProxy(port, `${HTTP()}/json`);
+    const held = await lastHeld();
+    const headers = held.response!.headers.map(([k, v]) => [k.toLowerCase() === 'content-length' ? 'Content-Length' : k, v] as [string, string]);
+    queue.forward(held.key, { headers: [...headers, ['X-Edit', '1']], body: '{"role":"administrator"}' });
+    const r = await p;
+    assert.equal(r.status, 200);
+    assert.equal(r.body.toString(), '{"role":"administrator"}');
+    assert.equal(r.headers['content-length'], String('{"role":"administrator"}'.length));
   });
 
   it('forward tanpa edit: tidak dianggap modified', async () => {
