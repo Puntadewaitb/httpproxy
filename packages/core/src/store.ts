@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import type {
   Exchange,
   ExchangeSource,
@@ -87,6 +87,9 @@ function hostOf(url: string): { host: string; path: string } {
   }
 }
 
+/** node:sqlite mengembalikan BLOB sebagai Uint8Array; API Store tetap pakai Buffer. */
+const buf = (v: Uint8Array | null): Buffer | null => (v ? Buffer.from(v.buffer, v.byteOffset, v.byteLength) : null);
+
 const snapJson = (s: RequestSnapshot | ResponseSnapshot): string =>
   JSON.stringify({ ...s, body: s.body.toString('base64') });
 
@@ -97,20 +100,20 @@ function parseSnap<T extends RequestSnapshot | ResponseSnapshot>(json: string | 
 }
 
 export class Store {
-  readonly db: Database.Database;
+  readonly db: DatabaseSync;
 
   constructor(path = ':memory:') {
-    this.db = new Database(path);
-    if (path !== ':memory:') this.db.pragma('journal_mode = WAL');
+    this.db = new DatabaseSync(path);
+    if (path !== ':memory:') this.db.exec('PRAGMA journal_mode = WAL');
     this.db.exec(SCHEMA);
   }
 
   close(): void {
-    this.db.close();
+    if (this.db.isOpen) this.db.close();
   }
 
   insertExchange(e: NewExchange): void {
-    if (!this.db.open) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
+    if (!this.db.isOpen) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
     const { host, path } = hostOf(e.request.url);
     this.db
       .prepare(
@@ -136,7 +139,7 @@ export class Store {
 
   /** Request diedit user: kolom utama = yang diteruskan ke server, req_orig = aslinya. */
   setRequestEdit(id: string, effective: RequestSnapshot, original: RequestSnapshot): void {
-    if (!this.db.open) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
+    if (!this.db.isOpen) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
     const { host, path } = hostOf(effective.url);
     this.db
       .prepare(
@@ -155,12 +158,12 @@ export class Store {
   }
 
   setResponseOriginal(id: string, original: ResponseSnapshot): void {
-    if (!this.db.open) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
+    if (!this.db.isOpen) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
     this.db.prepare(`UPDATE exchanges SET resp_orig=? WHERE id=?`).run(snapJson(original), id);
   }
 
   saveResponse(id: string, r: ResponseSnapshot, durationMs: number | null): void {
-    if (!this.db.open) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
+    if (!this.db.isOpen) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
     this.db
       .prepare(
         `UPDATE exchanges SET status=?, status_message=?, resp_headers=?, resp_body=?, duration_ms=?,
@@ -170,25 +173,25 @@ export class Store {
   }
 
   setState(id: string, state: ExchangeState, error?: string): void {
-    if (!this.db.open) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
+    if (!this.db.isOpen) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
     this.db.prepare(`UPDATE exchanges SET state=?, error=COALESCE(?, error) WHERE id=?`).run(state, error ?? null, id);
   }
 
   /** Tandai aborted hanya kalau belum ada hasil lain (jangan timpa 'dropped'/'ok'). */
   markAborted(id: string): void {
-    if (!this.db.open) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
+    if (!this.db.isOpen) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
     this.db.prepare(`UPDATE exchanges SET state='aborted' WHERE id=? AND state='pending'`).run(id);
   }
 
   setWsClose(id: string, code: number | undefined, reason: string): void {
-    if (!this.db.open) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
+    if (!this.db.isOpen) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
     this.db
       .prepare(`UPDATE exchanges SET state='closed', ws_close_code=?, ws_close_reason=? WHERE id=?`)
       .run(code ?? null, reason, id);
   }
 
   insertWsMessage(m: Omit<WsMessage, 'seq'>): void {
-    if (!this.db.open) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
+    if (!this.db.isOpen) return; // event mockttp bisa tiba setelah store ditutup (shutdown)
     this.db
       .prepare(`INSERT INTO ws_messages (stream_id, direction, is_binary, content, ts) VALUES (?, ?, ?, ?, ?)`)
       .run(m.streamId, m.direction, m.isBinary ? 1 : 0, m.content, Math.round(m.ts));
@@ -203,7 +206,7 @@ export class Store {
       streamId: r.stream_id,
       direction: r.direction,
       isBinary: !!r.is_binary,
-      content: r.content as Buffer,
+      content: buf(r.content)!,
       ts: r.ts,
     }));
   }
@@ -231,7 +234,7 @@ export class Store {
 
   list(f: ListFilter = {}): ExchangeSummary[] {
     const where: string[] = [];
-    const args: unknown[] = [];
+    const args: SQLInputValue[] = [];
     if (f.host) {
       where.push(`instr(lower(host), lower(?)) > 0`);
       args.push(f.host);
@@ -282,7 +285,7 @@ export class Store {
         url: r.url,
         httpVersion: r.http_version,
         headers: headers(r.req_headers),
-        body: r.req_body as Buffer,
+        body: buf(r.req_body)!,
       },
       response:
         r.status === null
@@ -291,7 +294,7 @@ export class Store {
               statusCode: r.status,
               statusMessage: r.status_message ?? '',
               headers: headers(r.resp_headers),
-              body: (r.resp_body as Buffer | null) ?? Buffer.alloc(0),
+              body: buf(r.resp_body) ?? Buffer.alloc(0),
             },
       requestOriginal: parseSnap<RequestSnapshot>(r.req_orig),
       responseOriginal: parseSnap<ResponseSnapshot>(r.resp_orig),
