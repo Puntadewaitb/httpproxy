@@ -34,7 +34,8 @@ const T = `http://127.0.0.1:${tport}`;
 const app = await electron.launch({
   executablePath: process.env.APP_EXECUTABLE ?? electronBin,
   args: process.env.APP_EXECUTABLE ? ['--no-sandbox'] : ['--no-sandbox', appDir],
-  env: { ...process.env, PROXYKIT_DATA_DIR: mkdtempSync(join(tmpdir(), 'proxykit-e2e-')), PROXYKIT_PORT: '0' },
+  // Data dir sengaja belum ada: menguji first run di mesin baru.
+  env: { ...process.env, PROXYKIT_DATA_DIR: join(mkdtempSync(join(tmpdir(), 'proxykit-e2e-')), 'first-run', '.proxykit'), PROXYKIT_PORT: '0' },
 });
 const page = await app.firstWindow();
 const errors = [];

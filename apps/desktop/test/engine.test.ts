@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -185,6 +185,17 @@ describe('Engine', () => {
     assert.equal(s2.settings.intercept.timeoutMs, 5000);
     await e2.dispose();
     await engine.configureIntercept({ requests: false, timeoutMs: 0 });
+  });
+
+  it('first run: data dir belum ada -> dibuat otomatis (bukan crash sebelum window)', async () => {
+    const fresh = join(mkdtempSync(join(tmpdir(), 'proxykit-desktop-')), 'belum', 'ada', '.proxykit');
+    assert.equal(existsSync(fresh), false);
+    const e3 = new Engine(fresh, 0);
+    const s3 = await e3.start();
+    assert.ok(s3.running, s3.error ?? 'proxy tidak jalan');
+    assert.ok(existsSync(join(fresh, 'history.db')));
+    assert.ok(existsSync(join(fresh, 'ca-cert.pem')));
+    await e3.dispose();
   });
 
   it('ganti port -> proxy restart di port baru', async () => {

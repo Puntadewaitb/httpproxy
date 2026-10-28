@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { isUtf8 } from 'node:buffer';
@@ -104,6 +104,8 @@ export class Engine extends EventEmitter<EngineEvents> {
 
   constructor(readonly dataDir: string, private overridePort?: number) {
     super();
+    // First run: folder data belum ada. Harus dibuat sebelum history.db dibuka (CA baru dibuat nanti di start()).
+    mkdirSync(dataDir, { recursive: true, mode: 0o700 });
     this.settingsPath = join(dataDir, 'desktop-settings.json');
     this.settings = this.loadSettings();
     this.store = new Store(join(dataDir, 'history.db'));
