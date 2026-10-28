@@ -1,0 +1,39 @@
+appId: id.proxykit.desktop
+productName: ProxyKit
+executableName: proxykit
+copyright: Copyright © 2026 Yogi
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - "!**/*.map"
+  - package.json
+# Tidak ada native module (node:sqlite built-in), jadi tidak perlu rebuild per platform.
+npmRebuild: false
+asar: true
+artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
+portable:
+  artifactName: ${productName}-Portable-${version}-${arch}.${ext}
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  category: public.app-category.developer-tools
+linux:
+  executableName: proxykit
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Development

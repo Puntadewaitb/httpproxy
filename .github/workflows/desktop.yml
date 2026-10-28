@@ -1,0 +1,88 @@
+name: desktop
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # untuk upload ke GitHub Release saat push tag v*
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            os: windows-latest
+            builder: --win
+            exe: release/win-unpacked/proxykit.exe
+            artifacts: |
+              apps/desktop/release/*.exe
+          - name: macos
+            os: macos-latest # arm64
+            builder: --mac
+            exe: release/mac-arm64/ProxyKit.app/Contents/MacOS/ProxyKit
+            artifacts: |
+              apps/desktop/release/*.dmg
+          - name: linux
+            os: ubuntu-latest
+            builder: --linux
+            exe: release/linux-unpacked/proxykit
+            artifacts: |
+              apps/desktop/release/*.AppImage
+    runs-on: ${{ matrix.os }}
+    env:
+      # Belum ada sertifikat code signing: jangan cari identity di keychain (macOS).
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test (core + desktop)
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Package
+        working-directory: apps/desktop
+        run: npx electron-builder ${{ matrix.builder }} --publish never
+
+      - name: E2E terhadap binary hasil packaging
+        working-directory: apps/desktop
+        shell: bash
+        env:
+          APP_EXECUTABLE: ${{ matrix.exe }}
+          SHOTS_DIR: e2e/screenshots
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then xvfb-run -a node e2e/smoke.mjs; else node e2e/smoke.mjs; fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ProxyKit-${{ matrix.name }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-screenshots-${{ matrix.name }}
+          path: apps/desktop/e2e/screenshots
+          if-no-files-found: ignore
+
+      - name: Upload ke GitHub Release (tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifacts }}

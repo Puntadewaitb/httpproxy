@@ -73,6 +73,6 @@ Event untuk UI: `proxy.on('exchange' | 'tls-error' | 'client-error')`, `queue.on
 - **WebSocket**: capture dua arah (text/binary) + close code; frame belum bisa di-intercept/edit.
 - **HTTP/2**: belum diuji di sini (semua test HTTP/1.1).
 - Repeater tidak decode `zstd` (dikembalikan apa adanya).
-- Belum ada: packaging installer desktop (electron-builder), setup device Android/iOS (adb, install CA ke system store), Frida untuk bypass pinning, match-and-replace otomatis. Semuanya butuh mesin dengan display/device.
+- Belum ada: code signing installer desktop, setup device Android/iOS (adb, install CA ke system store), Frida untuk bypass pinning, match-and-replace otomatis. Semuanya butuh mesin dengan display/device.
 - Node 22.x mencetak `ExperimentalWarning: SQLite` sekali saat start (node:sqlite masih experimental di 22; di Electron/Node 24 tidak).
 - `npm audit` melaporkan advisory `basic-ftp` (transitive: mockttp → pac-proxy-agent → get-uri). Hanya terjangkau kalau PAC di-fetch via FTP; tidak relevan untuk pemakaian proxy lokal ini.

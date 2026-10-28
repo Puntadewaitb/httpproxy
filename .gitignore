@@ -6,3 +6,4 @@ dist/
 ca-key.pem
 .proxykit/
 apps/desktop/e2e/screenshots/
+apps/desktop/release/

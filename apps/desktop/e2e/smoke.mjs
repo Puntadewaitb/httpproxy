@@ -1,6 +1,6 @@
 // Smoke test E2E: jalankan app Electron asli, kirim traffic lewat proxy, uji History / Intercept / Repeater.
 // Pakai: npm run build && node e2e/smoke.mjs   (Linux tanpa display: xvfb-run -a node e2e/smoke.mjs)
-// Butuh package `playwright` (tidak di-install otomatis: npm i -D playwright).
+// Uji binary hasil packaging: APP_EXECUTABLE=release/linux-unpacked/proxykit node e2e/smoke.mjs
 import { strict as assert } from 'node:assert';
 import { mkdtempSync, mkdirSync } from 'node:fs';
 import http from 'node:http';
@@ -32,8 +32,8 @@ const tport = target.address().port;
 const T = `http://127.0.0.1:${tport}`;
 
 const app = await electron.launch({
-  executablePath: electronBin,
-  args: ['--no-sandbox', appDir],
+  executablePath: process.env.APP_EXECUTABLE ?? electronBin,
+  args: process.env.APP_EXECUTABLE ? ['--no-sandbox'] : ['--no-sandbox', appDir],
   env: { ...process.env, PROXYKIT_DATA_DIR: mkdtempSync(join(tmpdir(), 'proxykit-e2e-')), PROXYKIT_PORT: '0' },
 });
 const page = await app.firstWindow();

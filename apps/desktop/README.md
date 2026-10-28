@@ -34,6 +34,19 @@ Env opsional: `PROXYKIT_DATA_DIR` (default `~/.proxykit`, **sama dengan CLI** su
 
 Renderer menampilkan traffic dari target (untrusted), jadi: `contextIsolation`, `sandbox`, tanpa `nodeIntegration`, CSP ketat tanpa inline script, body tidak pernah di-render sebagai HTML, navigasi & `window.open` diblok, semua permission request ditolak, IPC hanya diterima dari halaman app sendiri, regex scope divalidasi di main sebelum masuk core, intercept **selalu OFF** saat app start (walau setting terakhir ON). Proxy listen di semua interface (perlu untuk device mobile), jadi jalankan di jaringan yang kamu kontrol.
 
+## Build installer
+
+```bash
+npm run build && cd apps/desktop
+npx electron-builder --win     # release/ProxyKit-Setup-<ver>-x64.exe + ProxyKit-Portable-<ver>-x64.exe
+npx electron-builder --mac     # release/*.dmg (x64 + arm64)
+npx electron-builder --linux   # release/*.AppImage
+```
+
+Build Windows dari Linux/macOS butuh `wine`. Cara yang disarankan: GitHub Actions (`.github/workflows/desktop.yml`) build di runner Windows/macOS/Linux asli, menjalankan E2E terhadap **binary hasil packaging**, lalu upload installer sebagai artifact. Push tag `v*` (mis. `v0.1.0`) untuk melampirkan installer ke GitHub Release.
+
+Installer belum di-sign: Windows SmartScreen akan memperingatkan (*More info → Run anyway*), macOS Gatekeeper perlu klik kanan → *Open*. Untuk distribusi ke pihak lain siapkan sertifikat code signing (Windows OV/EV, Apple Developer ID + notarization).
+
 ## Test
 
 ```bash
@@ -45,4 +58,4 @@ E2E menyimpan screenshot di `e2e/screenshots/`.
 
 ## Belum ada
 
-Packaging installer (electron-builder + signing), editor dengan syntax highlight (CodeMirror), match & replace rules, intercept frame WebSocket, setup device Android/iOS otomatis (adb / install CA ke system store).
+Code signing installer, icon app, auto-update, editor dengan syntax highlight (CodeMirror), match & replace rules, intercept frame WebSocket, setup device Android/iOS otomatis (adb / install CA ke system store).
